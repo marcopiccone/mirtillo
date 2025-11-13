@@ -19,6 +19,10 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonValue>
+// Warning handler
+#include <QtGlobal>        // per qInstallMessageHandler
+#include <QLoggingCategory>
+#include <cstdio>          // per fprintf
 
 // ------------------------
 //  Standard / Qt utils
@@ -108,8 +112,31 @@ static QHash<QString,int> buildPageMap(const QJsonObject& content) {
     return map;
 }
 
+// Message handler personalizzato: silenzia solo i warning di qt.core.locale
+void mirtilloMessageHandler(QtMsgType type,
+                            const QMessageLogContext &context,
+                            const QString &msg){
+    Q_UNUSED(context);
+
+    // Filtra via i warning sul locale ANSI_X3.4-1968 / UTF-8 mancanti
+    if (type == QtWarningMsg) {
+        if (msg.contains("ANSI_X3.4-1968", Qt::CaseInsensitive) ||
+            msg.contains("Qt depends on a UTF-8 locale", Qt::CaseInsensitive)) {
+            return; // ignora completamente questo warning
+        }
+    }
+
+    // Tutto il resto lo scriviamo su stderr normalmente
+    QByteArray local = msg.toLocal8Bit();
+    fprintf(stderr, "%s\n", local.constData());
+}
+
 int main(int argc, char *argv[]) {
-    // Locale/UTF-8 PRIMA di creare QCoreApplication (evita warning)
+    
+    // 0) Installa il message handler per silenziare qt.core.locale
+    qInstallMessageHandler(mirtilloMessageHandler);
+
+    // 1) Prova comunque a forzare UTF-8 (innocuo su Paper Pro)
     setlocale(LC_ALL, "C.UTF-8");
     qputenv("LANG",     QByteArray("C.UTF-8"));
     qputenv("LC_ALL",   QByteArray("C.UTF-8"));
@@ -119,40 +146,45 @@ int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     QTextStream out(stdout), in(stdin);
 
-    out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
-    out << "----------------------------------------------\n";
-    out.flush();
-
-    // Flag debug opzionale
+    // Gestione opzioni --version / --about / --debug
     bool debug = false;
-
-    // Handle --version
     for (int i = 1; i < argc; ++i) {
         const QString arg = QString::fromUtf8(argv[i]).trimmed();
+
         if (arg == "--version") {
-            QTextStream out(stdout);
-            out << "mirtillo version " << MIRTILLO_VERSION << "\n";
+            out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
             return 0;
         }
+
+        if (arg == "--about") {
+            QString path;
+
+            // Override da variabile d'ambiente (utile in VM)
+            if (qEnvironmentVariableIsSet("MIRTILLO_ABOUT_PATH")) {
+                path = qEnvironmentVariable("MIRTILLO_ABOUT_PATH");
+            } else {
+                // Path runtime sul dispositivo
+                path = QStringLiteral("/home/root/.local/share/mirtillo/ABOUT.txt");
+            }
+
+            QFile f(path);
+            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                out << "Error: could not open ABOUT file: " << path << "\n";
+                return 1;
+            }
+
+            out << f.readAll() << "\n";
+            return 0;
+        }
+
         if (arg == "--debug") {
             debug = true;
         }
     }
 
-    // Check for --about
-    for (int i = 1; i < argc; ++i) {
-        QString arg = QString::fromUtf8(argv[i]).trimmed();
-        if (arg == "--about") {
-            QFile f(QStringLiteral(MIRTILLO_ABOUT_PATH));
-            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                out << "Error: could not open ABOUT file: "
-                    << QStringLiteral(MIRTILLO_ABOUT_PATH) << "\n";
-                return 1;
-            }
-            out << f.readAll() << "\n";
-            return 0;
-        }
-    }
+    out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
+    out << "----------------------------------------------\n";
+    out.flush();
 
     for (int i = 1; i < argc; ++i) {
         if (QString::fromUtf8(argv[i]) == "--debug") { debug = true; break; }
