@@ -51,28 +51,6 @@ All without touching the rootfs (read-only on firmware 3.23+).
 
 ---
 
-## 🔧 Required SDK Setup (IMPORTANT)
-
-Before building mirtillo, you **must** load the reMarkable SDK environment.
-
-From inside your Debian 12 VM:
-
-```bash
-export QEMU_LD_PREFIX="$HOME/rm-sdk/sysroots/cortexa53-crypto-remarkable-linux"
-source "$HOME/rm-sdk/environment-setup-cortexa53-crypto-remarkable-linux"
-```
-
-This step:
-
-- configures the cross-compiler  
-- places the SDK version of `cmake` at the front of your `PATH`  
-- configures the sysroot and linker  
-- makes sure all builds are compiled for **aarch64-remarkable-linux**
-
-You do **not** need to modify your `.bashrc`: just run these two lines in every new shell before building.
-
----
-
 ## 🛠️ Requirements (host side)
 
 - macOS (Apple Silicon) or Linux  
@@ -83,12 +61,19 @@ You do **not** need to modify your `.bashrc`: just run these two lines in every 
 ---
 
 ## 🏗️ Building mirtillo
+Before building, load the reMarkable SDK environment:
 
 ```bash
-# 1) Load SDK environment
-export QEMU_LD_PREFIX="$HOME/rm-sdk/sysroots/cortexa53-crypto-remarkable-linux"
-source "$HOME/rm-sdk/environment-setup-cortexa53-crypto-remarkable-linux"
+# 1) Set the SDK path (adjust this to match your installation)
+export RMSDK="<path-to-your-sdk>"
 
+# 2) Load the SDK toolchain environment
+export QEMU_LD_PREFIX="$RMSDK/sysroots/cortexa53-crypto-remarkable-linux"
+source "$RMSDK/environment-setup-cortexa53-crypto-remarkable-linux"
+```
+
+Now build:
+```bash
 # 2) Build
 git clone https://github.com/<your-user>/mirtillo.git
 cd mirtillo
@@ -117,8 +102,8 @@ A helper script can be used after each firmware update to recreate the local bin
 Copy the script and run it (once per firmware update):
 
 ```bash
-scp scripts/post_setup_update.sh root@10.11.99.1:/home/root/post-update-mirtillo-setup.sh
-ssh root@10.11.99.1 'sh ~/post-update-mirtillo-setup.sh || true'
+scp scripts/post_setup_update.sh root@10.11.99.1:/home/root/post-setup-update.sh
+ssh root@10.11.99.1 'sh ~/post-setup-update.sh || true'
 ```
 
 This will:
