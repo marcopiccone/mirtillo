@@ -1,0 +1,196 @@
+// ========================
+//  Qt Core includes
+// ========================
+
+// Gestisce il ciclo principale dell’applicazione (anche per programmi console)
+#include <QCoreApplication>
+
+// Gestione di directory e file system (equivalente a std::filesystem)
+#include <QDir>
+#include <QFileInfo>
+
+// Lettura e scrittura di file (equivalente a std::ifstream/ofstream, ma con supporto Unicode)
+#include <QFile>
+
+// Lettura e parsing di documenti JSON
+#include <QJsonDocument>   // rappresenta un documento JSON completo
+#include <QJsonObject>     // rappresenta un oggetto JSON (chiavi → valori)
+#include <QJsonValue>      // rappresenta un singolo valore JSON
+
+// Input/output testuale su console (equivalente a std::cin/std::cout, ma con supporto Unicode)
+#include <QTextStream>
+
+// ========================
+//  Standard C++ includes
+// ========================
+
+// Ordinamento, contenitori e manipolazione generica
+#include <algorithm>       // std::sort
+#include <QStringList>     // lista di QString (come QList<QString>)
+#include <QList>           // contenitore tipo QVector<T>
+
+// Gestione locale e ambiente (per il fix UTF-8)
+#include <clocale>         // setlocale()
+#include <QLocale>         // QLocale::setDefault()
+#include <QByteArray>      // tipo richiesto da qputenv()
+
+
+struct DocEntry {
+    QString uuid;
+    QString visibleName;
+    QString parentUuid;   // "" se assente
+    bool    hasParent = false; // false se fuori da cartella (o 'trash')
+    QString kind;         // "pdf" | "epub"
+    int     pages = 0;    // futuro: per ora 0
+    bool    hasTags = false; // futuro: per ora false
+};
+
+static const QString kBase = QStringLiteral("/home/root/.local/share/remarkable/xochitl");
+
+static bool loadMetadata(const QString& metaPath, QJsonObject& out) {
+    QFile f(metaPath);
+    if (!f.open(QIODevice::ReadOnly)) return false;
+    const auto doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isObject()) return false;
+    out = doc.object();
+    return true;
+}
+
+int main(int argc, char *argv[]) {
+    // 1) Ambiente/locale *prima* dell’istanza Qt
+    setlocale(LC_ALL, "C.UTF-8");
+    qputenv("LANG",     QByteArray("C.UTF-8"));
+    qputenv("LC_ALL",   QByteArray("C.UTF-8"));
+    qputenv("LC_CTYPE", QByteArray("C.UTF-8"));
+    QLocale::setDefault(QLocale::c());
+
+    // 2) Ora crea l’app Qt
+    QCoreApplication app(argc, argv);
+    QTextStream out(stdout), in(stdin);
+
+    QDir d(kBase);
+    if (!d.exists()) {
+        out << "Directory not found: " << kBase << "\n";
+        return 1;
+    }
+
+    // trova tutti i *.metadata
+    QStringList metas = d.entryList(QStringList() << "*.metadata", QDir::Files, QDir::Name);
+    QList<DocEntry> pdfs, epubs;
+
+    for (const QString& metaFile : metas) {
+        // UUID = nome file senza estensione
+        QString uuid = metaFile;
+        uuid.chop(QStringLiteral(".metadata").size());
+
+        const QString pdfPath  = kBase + "/" + uuid + ".pdf";
+        const QString epubPath = kBase + "/" + uuid + ".epub";
+
+        // classificazione: solo PDF/EPUB; ignora il resto (notebook)
+        QString kind;
+        if (QFileInfo::exists(epubPath))
+            kind = "epub";
+        else if (QFileInfo::exists(pdfPath))
+            kind = "pdf";
+        else
+            continue; // notebook o altro
+
+        // parse metadata json
+        QJsonObject meta;
+        if (!loadMetadata(kBase + "/" + metaFile, meta)) continue;
+
+        const bool isDeleted = meta.value("deleted").toBool(false);
+        const QJsonValue parentV = meta.value("parent");
+
+        QString parentStr;         // vuota = nessuna cartella (root)
+        bool inTrash = false;
+
+        // Non elenchiamo i file eliminati o nel cestiono
+        if (parentV.isBool()) {
+        // parent: false  → file in My Files (root)
+        if (parentV.toBool() == false) {
+            parentStr.clear();
+        } else {
+            // (caso teorico: true non usato; trattalo come root)
+            parentStr.clear();
+        }
+        } else if (parentV.isString()) {
+            const QString p = parentV.toString();
+            if (p == "trash") {
+                inTrash = true;
+            } else {
+                parentStr = p;     // UUID di una cartella reale (o stringa vuota = root)
+            }
+        } else {
+            // parent assente o di tipo inatteso → considera root
+            parentStr.clear();
+        }
+
+        // filtri
+        if (isDeleted)    continue;   // file marcato deleted
+        if (inTrash)      continue;   // nel cestino
+
+        
+        DocEntry e;
+        e.uuid = uuid;
+        e.visibleName = meta.value("visibleName").toString(uuid);
+        e.parentUuid = parentStr;          // "" = root/My Files
+        e.hasParent = !e.parentUuid.isEmpty();
+        e.kind = kind;                     // "pdf" | "epub"
+        e.pages = 0;                       // placeholder campi futuri
+        e.hasTags = false;                 // placeholder campi futuri
+
+        if (kind == "pdf") pdfs.append(e); else epubs.append(e);
+    }
+
+    // Ordinamento alfabetico consapevole di locale
+    auto byName = [](const DocEntry& a, const DocEntry& b){
+        return QString::localeAwareCompare(a.visibleName, b.visibleName) < 0;
+    };
+    std::sort(pdfs.begin(),  pdfs.end(),  byName);
+    std::sort(epubs.begin(), epubs.end(), byName);
+
+    // menù: chiedi tipo
+    out << "\nDocument type to list? [p] PDF  [e] EPUB  [q] quit: ";
+    out.flush();
+    QString choice = in.readLine().trimmed().toLower();
+    const QList<DocEntry>* list = nullptr;
+    if (choice == "p") list = &pdfs;
+    else if (choice == "e") list = &epubs;
+    else return 0;
+
+    if (list->isEmpty()) {
+        out << "No documents found for the selected type.\n";
+        return 0;
+    }
+
+    // stampa su 2 colonne: "NN) Title" (UUID abbreviato opzionale)
+    auto printList = [&](const QList<DocEntry>& L) {
+        const int n = L.size();
+        const int colw = 48; // larghezza colonna
+        for (int i = 0; i < n; ) {
+            QString left = QString("%1) %2").arg(i+1, 3, 10, QChar(' ')).arg(L[i].visibleName.left(colw-7));
+            QString right;
+            if (i+1 < n) {
+                right = QString("%1) %2").arg(i+2, 3, 10, QChar(' ')).arg(L[i+1].visibleName.left(colw-7));
+            }
+            out << left.leftJustified(colw) << "  " << right << "\n";
+            i += 2;
+        }
+    };
+
+    out << "\nFound " << list->size() << " " << (list==&pdfs ? "PDF" : "EPUB") << " document(s):\n\n";
+    printList(*list);
+
+    out << "\nSelect a number (1-" << list->size() << ") or 0 to exit: ";
+    out.flush();
+    bool ok = false;
+    int sel = in.readLine().trimmed().toInt(&ok);
+    if (!ok || sel <= 0 || sel > list->size()) return 0;
+
+    const DocEntry& pick = list->at(sel-1);
+    out << "\nTitle : " << pick.visibleName << "\n";
+    out << "UUID  : " << pick.uuid << "\n";
+    out << "Parent: " << (pick.hasParent ? pick.parentUuid : "false") << "\n";
+    return 0;
+}
