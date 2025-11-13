@@ -1,0 +1,36 @@
+# Build directories
+/build/
+/build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled objects
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+
+# IDE / editor
+*.user
+*.pro.user
+.idea/
+.vscode/
+*.swp
+*~
+
+# Toolchain / SDK archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# QEMU disk images
+*.qcow2
+*.img
+*.iso

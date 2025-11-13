@@ -1,8 +1,0 @@
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/mirtillo.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/deploy.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/edit_cache.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/rebuild_cache.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/list_install_components.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/install.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/install/local.dir
-/home/marco/sdk-test/mirtillo/build/CMakeFiles/install/strip.dir
