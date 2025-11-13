@@ -16,6 +16,12 @@ qt_add_executable(mirtillo
 
 target_link_libraries(mirtillo PRIVATE Qt6::Core)
 
+# Provide project version to the source code
+target_compile_definitions(mirtillo PRIVATE
+    MIRTILLO_VERSION="${PROJECT_VERSION}"
+    MIRTILLO_ABOUT_PATH="${CMAKE_SOURCE_DIR}/ABOUT.txt"
+)
+
 target_compile_options(mirtillo PRIVATE -Wall -Wextra -Wpedantic)
 target_compile_options(mirtillo PRIVATE -Os)
 target_link_options(mirtillo PRIVATE -Wl,--as-needed)

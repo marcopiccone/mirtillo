@@ -1,0 +1,9 @@
+mirtillo — metadata extraction utility for reMarkable Paper Pro
+---------------------------------------------------------------
+
+mirtillo is an external, user-space CLI tool that parses document metadata
+(.metadata and .content files) to build per-document tag indexes, link tags
+to page UUIDs, reconstruct page numbers, and serve as the backend for
+future exporters (PDF summaries, annotation extraction, etc.).
+
+The project is not affiliated with reMarkable AS.

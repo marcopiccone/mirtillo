@@ -119,8 +119,41 @@ int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     QTextStream out(stdout), in(stdin);
 
+    out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
+    out << "----------------------------------------------\n";
+    out.flush();
+
     // Flag debug opzionale
     bool debug = false;
+
+    // Handle --version
+    for (int i = 1; i < argc; ++i) {
+        const QString arg = QString::fromUtf8(argv[i]).trimmed();
+        if (arg == "--version") {
+            QTextStream out(stdout);
+            out << "mirtillo version " << MIRTILLO_VERSION << "\n";
+            return 0;
+        }
+        if (arg == "--debug") {
+            debug = true;
+        }
+    }
+
+    // Check for --about
+    for (int i = 1; i < argc; ++i) {
+        QString arg = QString::fromUtf8(argv[i]).trimmed();
+        if (arg == "--about") {
+            QFile f(QStringLiteral(MIRTILLO_ABOUT_PATH));
+            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                out << "Error: could not open ABOUT file: "
+                    << QStringLiteral(MIRTILLO_ABOUT_PATH) << "\n";
+                return 1;
+            }
+            out << f.readAll() << "\n";
+            return 0;
+        }
+    }
+
     for (int i = 1; i < argc; ++i) {
         if (QString::fromUtf8(argv[i]) == "--debug") { debug = true; break; }
     }
