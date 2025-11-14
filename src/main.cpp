@@ -131,6 +131,13 @@ void mirtilloMessageHandler(QtMsgType type,
     fprintf(stderr, "%s\n", local.constData());
 }
 
+static QString mirtilloHeader(const QString &version) {
+    QString line1 = " /\\_/\\    mirtillo v" + version;
+    QString line2 = "( o.o )   Paper Pro CLI tool";
+    QString line3 = " > ^ <    meta/tag extractor";
+    return line1 + "\n" + line2 + "\n" + line3;
+}
+
 int main(int argc, char *argv[]) {
     
     // 0) Installa il message handler per silenziare qt.core.locale
@@ -152,7 +159,11 @@ int main(int argc, char *argv[]) {
         const QString arg = QString::fromUtf8(argv[i]).trimmed();
 
         if (arg == "--version") {
-            out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
+            out << "\n";
+            out << mirtilloHeader(QStringLiteral(MIRTILLO_VERSION)) << "\n\n";
+            out << "\n";
+
+            out.flush();
             return 0;
         }
 
@@ -181,10 +192,6 @@ int main(int argc, char *argv[]) {
             debug = true;
         }
     }
-
-    out << "mirtillo v" << MIRTILLO_VERSION << " (Paper Pro CLI)\n";
-    out << "----------------------------------------------\n";
-    out.flush();
 
     for (int i = 1; i < argc; ++i) {
         if (QString::fromUtf8(argv[i]) == "--debug") { debug = true; break; }

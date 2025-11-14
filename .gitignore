@@ -2,6 +2,9 @@
 /build/
 /build-*/
 
+# Scripts
+scripts/build_host.sh
+
 # CMake
 CMakeCache.txt
 CMakeFiles/

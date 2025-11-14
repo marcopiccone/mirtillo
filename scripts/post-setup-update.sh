@@ -5,6 +5,7 @@ set -eu
 
 BIN_DIR="$HOME/.local/bin"
 LIB_DIR="$HOME/.local/lib"
+SHARE_DIR="$HOME/.local/share/mirtillo"
 PROFILE="$HOME/.profile"
 
 say() { printf '%s\n' "$*"; }
@@ -26,13 +27,9 @@ say "== post-update setup (mirtillo) =="
 
 ensure_dir "$BIN_DIR"
 ensure_dir "$LIB_DIR"
+ensure_dir "$SHARE_DIR"
 
 ensure_line "$PROFILE" 'export PATH="$HOME/.local/bin:$PATH"'
 ensure_line "$PROFILE" 'export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"'
-
-# reMarkable firmwares typically only provide "C" / "POSIX" locales.
-ensure_line "$PROFILE" "export LANG=C"
-ensure_line "$PROFILE" "export LC_ALL=C"
-ensure_line "$PROFILE" "export QT_LOGGING_RULES='qt.core.locale.warning=false'"
 
 say "Setup complete. Run: . $PROFILE"

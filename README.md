@@ -1,81 +1,135 @@
-# mirtillo  
-*A metadata-driven extension for the reMarkable Paper Pro — generating per-document tag indexes, extracting highlights/notes, and exporting structured summaries.*
+# mirtillo
+*A metadata‑driven extension for the reMarkable Paper Pro — generating per‑document tag indexes, extracting highlights/notes, and exporting structured summaries.*
 
 ---
 
 ## 📘 Overview
 
-**mirtillo** is a command-line tool that runs directly on the reMarkable Paper Pro.  
-It parses document metadata, page UUIDs, tags, and page mappings from:
+**mirtillo** is a command‑line tool designed to operate entirely in user space on the  
+**reMarkable Paper Pro**, providing advanced document‑introspection features not exposed  
+by the official `xochitl` reader.
 
-```text
+mirtillo **does not modify system files**, does not remount the rootfs, and remains fully  
+compatible with firmware **3.23+**, where the root filesystem is read‑only.
+
+Its long‑term goal is to become a companion utility that:
+
+- Builds **per‑document tag indexes**
+- Extracts:
+  - tagged pages  
+  - highlights  
+  - handwritten notes (when available)  
+- Generates a **summary PDF** containing:
+  - tag → page → page UUID mapping  
+  - text excerpts  
+  - notes  
+  - optional thumbnails  
+- Copies the summary automatically to your computer
+
+---
+
+## 🌟 Features (current)
+
+- Parses `.metadata` and `.content` for all documents under:
+
+```
 /home/root/.local/share/remarkable/xochitl/
 ```
 
-The goal is **not to replace `xochitl`**, but to complement it with advanced  
-metadata-based features the official UI does not expose.
+- Detects document type via `extraMetaData.fileType`
+- Classifies documents:
+  - PDF
+  - EPUB
+  - Notebook
+- Extracts:
+  - visible name
+  - folder hierarchy (`parent` UUID)
+  - deletion status
+  - per‑page tags (`pageTags`)
+  - page numbers (`cPages.pages[].redir.value`)
+- Displays structured document previews via CLI
+- Installs cleanly into:
+```
+/home/root/.local/bin/mirtillo
+/home/root/.local/share/mirtillo/ABOUT.txt
+```
+- Includes:
+  - `--version`
+  - `--about`
+  - `--debug`
+- Fully independent from `xochitl`
 
 ---
 
-## 🎯 Project Goal
+## 🔮 Roadmap
 
-mirtillo aims to eventually provide:
+### Phase 1 — Core CLI (complete)
+- Document discovery
+- Parsing metadata + content
+- Tag extraction
+- Page mapping
 
-- a **complete tag index per document**
-- extraction of:
-  - tagged pages
-  - underlined passages
-  - handwritten notes (when possible)
-- generation of a **summary PDF** containing:
-  - tag → page number → UUID mappings
-  - extracted annotations
-  - optional thumbnails
-- automatic export to the host laptop
+### Phase 2 — Export Engine (planned)
+- Export tagged excerpts
+- Extract highlights and annotations
+- Gather thumbnails
+- Produce JSON summaries
+- Generate PDF summaries
 
-All without touching the rootfs (read-only on firmware 3.23+).
-
----
-
-## 🌟 Current Features
-
-- Lists all documents (PDF / EPUB / Notebook)
-- Parses:
-  - `.metadata`
-  - `.content`
-  - `cPages.pages` mappings
-  - per-page tags (`pageTags`)
-  - folder parent relationships (`parent` UUIDs)
-- Shows tags with page numbers and UUIDs
-- Works fully under `/home/root/.local/bin`
-- Survives firmware 3.23+ updates using a post-update script
+### Phase 3 — Integration Layer
+- Auto‑sync
+- On‑device Qt‑based viewer
+- macOS companion app
 
 ---
 
-## 🛠️ Requirements (host side)
+## 📦 Repository Structure
 
-- macOS (Apple Silicon) or Linux  
-- Debian 12 VM (if on macOS)  
-- reMarkable official SDK installed in `~/rm-sdk`  
-- SSH access to the Paper Pro over USB (`root@10.11.99.1`)
+```
+mirtillo/
+├── src/
+│   └── main.cpp
+├── scripts/
+│   ├── post-update-mirtillo-setup.sh
+│   └── deploy_to_paperpro.sh        # unified build+deploy helper
+├── CMakeLists.txt
+├── ABOUT.txt
+└── README.md
+```
 
 ---
 
-## 🏗️ Building mirtillo
-Before building, load the reMarkable SDK environment:
+# 🧰 Development Setup
+
+mirtillo is cross‑compiled using the **official reMarkable Paper Pro SDK**.
+
+## Install the SDK
+
+Follow the official instructions from reMarkable.  
+Assume your SDK is installed under:
+
+```
+$HOME/rm-sdk
+```
+
+Then load it into your shell:
 
 ```bash
-# 1) Set the SDK path (adjust this to match your installation)
-export RMSDK="<path-to-your-sdk>"
-
-# 2) Load the SDK toolchain environment
+export RMSDK="$HOME/rm-sdk"
 export QEMU_LD_PREFIX="$RMSDK/sysroots/cortexa53-crypto-remarkable-linux"
 source "$RMSDK/environment-setup-cortexa53-crypto-remarkable-linux"
 ```
 
-Now build:
+✔️ **This must be done before running CMake.**
+
+---
+
+# 🔧 Building mirtillo
+
+Inside your Debian x86_64 VM:
+
 ```bash
-# 2) Build
-git clone https://github.com/<your-user>/mirtillo.git
+git clone https://github.com/<your-username>/mirtillo.git
 cd mirtillo
 mkdir -p build
 cd build
@@ -84,380 +138,243 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j
 ```
 
-The binary will be created as:
+Build output:
 
-```text
+```
 build/mirtillo
 ```
 
 ---
 
-## 🚀 Deploy to Paper Pro
+### SDK environment not loaded
+If CMake reports missing compilers or cannot find Qt:
 
-### 1. First-time setup on the device
-
-On the device, mirtillo installs and runs entirely inside the home directory (`/home/root`).  
-A helper script can be used after each firmware update to recreate the local bin/lib dirs.
-
-Copy the script and run it (once per firmware update):
-
-```bash
-scp scripts/post_setup_update.sh root@10.11.99.1:/home/root/post-setup-update.sh
-ssh root@10.11.99.1 'sh ~/post-setup-update.sh || true'
+```
+export RMSDK="$HOME/rm-sdk"
+export QEMU_LD_PREFIX="$RMSDK/sysroots/cortexa53-crypto-remarkable-linux"
+source "$RMSDK/environment-setup-cortexa53-crypto-remarkable-linux"
 ```
 
-This will:
+Then re-run CMake.
 
-- create `~/.local/bin` and `~/.local/lib` if missing  
-- prepend `~/.local/bin` to `PATH`  
-- set a minimal locale environment (`LANG=C`, `LC_ALL=C`)  
-- silence noisy Qt locale warnings
+---
 
-### 2. Deploy the binary
+### Mismatch between build/ folders
+If you move the project directory manually, CMake will complain:
 
-From the VM, after building:
-
-```bash
-scp build/mirtillo root@10.11.99.1:/home/root/.local/bin/
+```
+The current CMakeCache.txt directory ... is different from ...
 ```
 
-### 3. Run on the device
+Fix by removing the old build:
+
+```
+rm -rf build/
+mkdir build
+cd build
+cmake ..
+```
+
+---
+
+# 🧪 Testing the build locally (QEMU‑ld)
+
+You can run the binary natively inside the VM even though it is built for aarch64:
+
+```bash
+export QEMU_LD_PREFIX="$RMSDK/sysroots/cortexa53-crypto-remarkable-linux"
+qemu-aarch64 ./buid/mirtillo --version
+```
+
+This uses the SDK's sysroot as a transparent loader.
+
+If it runs correctly under QEMU, it will run on the Paper Pro.
+
+---
+
+## 🧩 Developer Documentation
+See: [CODE_STRUCTURE.md](CODE_STRUCTURE.md)
+
+---
+
+# 🚀 Deploying to the Paper Pro
+
+Ensure USB‑SSH is enabled on the device.
+
+You may deploy in **three ways**:
+
+---
+
+## 1) Password‑based deploy
+```bash
+scripts/deploy_to_paperpro.sh --build --deploy
+```
+
+Prompts for password when necessary.
+
+---
+
+## 2) Deploy using SSH keys (recommended)
+
+# Generate a dedicated keypair for mirtillo
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/rm_key -C "remarkable-mirtillo"
+```
+
+### Copy key to the Paper Pro
+```bash
+ssh-copy-id -i ~/.ssh/rm_key.pub root@10.11.99.1
+```
+
+### Deploy without prompts
+```bash
+scripts/deploy_to_paperpro.sh --build --sshkeys
+```
+
+---
+
+## 3) Setup only once after reMarkable firmware updates (usually not necessqry now)
+
+The script:
+
+```
+scripts/post-update-mirtillo-setup.sh
+```
+
+creates:
+
+```
+~/.local/bin
+~/.local/lib
+~/.local/share/mirtillo
+```
+
+Run once after each firmware update:
+
+```bash
+ssh root@10.11.99.1 'sh /home/root/post-update-mirtillo-setup.sh'
+```
+
+---
+
+# 🖥️ Running mirtillo on the device
 
 ```bash
 ssh root@10.11.99.1
 mirtillo
 ```
 
-If `~/.profile` was updated by the post-update script, you may need to source it once:
+Example:
 
-```bash
-. ~/.profile
-mirtillo
 ```
-
----
-
-## 📝 Example Output
-
-```text
 Document type to list? [p] PDF  [e] EPUB  [n] notebook:
 p
 
 Found 42 PDF document(s):
 
-  1) Plato — Phaedrus                     2) Gospel of Thomas
-  3) Confutatio Omnium Haeresium         4) The Complete Tolkien Companion
+  1) Confutatio Omnium Haeresium          2) Gospel of Thomas
+  3) Plato — Phaedrus                      4) Tolkien Companion
   …
 
-Select a number: 3
+Select: 1
 
 Title : Confutatio Omnium Haeresium
 UUID  : 6667662b-ff4a-4e25-bf9d-b719a36c26f3
 Parent: <root>
 Tags:
-  1. Simon Mago, pag. 38 (UUID: bad5d945-fc7c-4a68-a522-290817f2413c)
-  2. Ofiti, pag. 41 (UUID: 8bb36620-4b0f-4355-8d3b-6f4ac68a61b3)
+  1. Simon Mago — page 38  (UUID: bad5d945‑fc7c‑4a68‑a522‑290817f2413c)
+  2. Ofiti — page 41       (UUID: 8bb36620‑4b0f‑4355‑8d3b‑6f4ac68a61b3)
 ```
 
 ---
 
-## 📦 Repository Layout
+# 🛠️ Troubleshooting
 
-```text
-mirtillo/
-├── CMakeLists.txt
-├── README.md
-├── .gitignore
-├── src/
-│   └── main.cpp
-├── scripts/
-│   ├── post_setup_update.sh
-│   └── deploy_to_paper_pro.sh
-└── cmake/
-    └── (reserved for future toolchain files, not required)
+### UTF‑8 warning on the Paper Pro
+The firmware’s locale is fixed to `C`.  
+The warning is harmless:
+
+```
+Detected locale "C" with character encoding "ANSI_X3.4-1968"
+```
+
+mirtillo ignores it correctly.  
+If needed, you may silence it by adding to `~/.profile`:
+
+```
+export QT_LOGGING_RULES='qt.core.locale.warning=false'
 ```
 
 ---
 
-## 🧩 Development notes
+### SSH password prompts (multiple)
+Ensure you are either:
 
-This section documents the internal structure of the project for developers who want
-to extend or modify `mirtillo`.
+- using `ssh-copy-id` (recommended), or  
+- deploying with `--sshkeys`
 
-### Build system (CMake)
+If you see repeated prompts, your private key may not be loaded:
 
-`mirtillo` uses a simple Qt 6 + CMake setup:
-
-```cmake
-cmake_minimum_required(VERSION 3.16)
-project(mirtillo VERSION 0.1 LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-find_package(Qt6 REQUIRED COMPONENTS Core)
-
-qt_add_executable(mirtillo
-  src/main.cpp
-)
-
-target_link_libraries(mirtillo PRIVATE Qt6::Core)
-
-target_compile_options(mirtillo PRIVATE -Wall -Wextra -Wpedantic)
-target_compile_options(mirtillo PRIVATE -Os)
-target_link_options(mirtillo PRIVATE -Wl,--as-needed)
-
-set_target_properties(mirtillo PROPERTIES
-  INSTALL_RPATH "\$ORIGIN/../lib"
-)
-
-include(GNUInstallDirs)
-install(TARGETS mirtillo RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+```
+ssh-add ~/.ssh/id_ed25519
 ```
 
-Key points:
+---
 
-- Only **QtCore** is required (console application, no GUI).
-- The target is a single executable named `mirtillo`.
-- Warnings are enabled (`-Wall -Wextra -Wpedantic`) and size is optimized (`-Os`).
-- `INSTALL_RPATH` points to `../lib` relative to the binary, in case Qt libraries
-  are bundled in the future.
-- Deployment to the device is handled by shell scripts, not by CMake directly.
+# 🏷️ Version Badge
 
-### Helper scripts
+You may add this badge at the top of the README:
 
-#### `scripts/deploy_to_paper_pro.sh`
+```
+![version](https://img.shields.io/badge/version-0.1-blue)
+```
+
+(It can be updated automatically when bumping project version.)
+
+---
+
+# ⚙️ Script Reference
+
+## mirtillo.sh
+
+Supports:
+
+- `--build`
+- `--deploy`
+- `--sshkeys`
+- `--setup`
+
+Examples:
 
 ```bash
-#!/usr/bin/env bash
-# Build and deploy mirtillo to reMarkable Paper Pro
-
-set -euo pipefail
-
-PROJECT_ROOT="$(cd "$(dirname "$0")/.."; pwd)"
-BUILD_DIR="$PROJECT_ROOT/build"
-TARGET_BIN="mirtillo"
-RM_HOST="root@10.11.99.1"
-RM_BIN_DIR="/home/root/.local/bin"
-
-echo "== Building =="
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
-
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j
-
-echo "== Deploying to ${RM_HOST}:${RM_BIN_DIR} =="
-scp "$TARGET_BIN" "${RM_HOST}:${RM_BIN_DIR}/"
-
-echo "Done."
+scripts/mirtillo.sh --build --deploy
+scripts/mirtillo.sh --build --sshkeys
+scripts/mirtillo.sh --setup
 ```
-
-This script:
-
-- configures the project in `build/` (using the SDK `cmake` already in `PATH`),
-- builds a **Release** binary,
-- copies `mirtillo` to the device under `/home/root/.local/bin`.
-
-It assumes:
-
-- the SDK environment is loaded (see “Required SDK Setup”),
-- SSH over USB at `root@10.11.99.1` is available.
-
-#### `scripts/post_setup_update.sh`
-
-```bash
-#!/usr/bin/env sh
-# Post-update setup for user-local filesystem on reMarkable Paper Pro 3.x
-
-set -eu
-
-BIN_DIR="$HOME/.local/bin"
-LIB_DIR="$HOME/.local/lib"
-PROFILE="$HOME/.profile"
-
-say() { printf '%s
-' "$*"; }
-
-ensure_dir() {
-  [ -d "$1" ] || { mkdir -p "$1"; say "Created: $1"; }
-}
-
-ensure_line() {
-  # $1=file, $2=exact line
-  [ -f "$1" ] || touch "$1"
-  if ! grep -Fqx -- "$2" "$1"; then
-    printf '%s
-' "$2" >> "$1"
-    say "Appended to $(basename "$1"): $2"
-  fi
-}
-
-say "== post-update setup (mirtillo) =="
-
-ensure_dir "$BIN_DIR"
-ensure_dir "$LIB_DIR"
-
-ensure_line "$PROFILE" 'export PATH="$HOME/.local/bin:$PATH"'
-ensure_line "$PROFILE" 'export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"'
-
-# reMarkable firmwares typically only provide "C" / "POSIX" locales.
-ensure_line "$PROFILE" "export LANG=C"
-ensure_line "$PROFILE" "export LC_ALL=C"
-ensure_line("$PROFILE" "export QT_LOGGING_RULES='qt.core.locale.warning=false'"
-
-say "Setup complete. Run: . $PROFILE"
-```
-
-This script is meant to be copied and executed **once per firmware update** on the device:
-
-- ensures `~/.local/bin` and `~/.local/lib` exist,
-- adds them to `PATH` and `LD_LIBRARY_PATH` in `~/.profile`,
-- sets `LANG`/`LC_ALL` to `"C"` and disables noisy Qt locale warnings.
-
-### Code structure (`src/main.cpp`)
-
-`main.cpp` contains all the CLI logic. It is organized into:
-
-1. **Data structures**
-2. **JSON helpers**
-3. **Main scan loop**
-4. **Interactive menu and tag listing**
-
-#### 1. Data structures
-
-```cpp
-struct TagRef {
-    QString name;
-    QString pageId;
-    int     pageNumber = -1; // -1 if unknown
-};
-
-struct DocEntry {
-    QString uuid;
-    QString visibleName;
-    QString parentUuid;   // "" = root / My Files
-    bool    hasParent = false;
-    QString kind;         // "pdf" | "epub" | "notebook"
-    QList<TagRef> tags;   // per-page tags
-    int     pages = 0;    // placeholder (not used yet)
-    bool    hasTags = false;
-};
-```
-
-- `TagRef` represents a single tag on a specific page (`name`, `pageId`, `pageNumber`).
-- `DocEntry` represents a document (PDF/EPUB/notebook) with its metadata and tags.
-
-The base directory of the reMarkable document store is:
-
-```cpp
-static const QString kBase =
-    QStringLiteral("/home/root/.local/share/remarkable/xochitl");
-```
-
-#### 2. JSON helpers
-
-```cpp
-static bool loadJsonObject(const QString& path, QJsonObject& out);
-static QString readFileType(const QJsonObject& content);
-static QJsonArray readPageTags(const QJsonObject& content);
-static QHash<QString,int> buildPageMap(const QJsonObject& content);
-```
-
-- `loadJsonObject`  
-  Opens a JSON file and returns its contents as a `QJsonObject`. Used for both
-  `*.metadata` and `*.content`.
-
-- `readFileType`  
-  Reads the document type from:
-  - `extraMetaData.fileType`
-  - or fallback `fileType` at the root level
-
-  Possible values: `"pdf"`, `"epub"`, `"notebook"`.
-
-- `readPageTags`  
-  Reads `pageTags` from:
-  - `extraMetaData.pageTags`
-  - or fallback `pageTags` at the root level.
-
-- `buildPageMap`  
-  Builds a map `pageId -> pageNumber` using:
-
-  - `cPages.pages[].redir.value`  
-  - or fallback root-level `pages` if `cPages` is missing.
-
-#### 3. Main scan loop
-
-In `main()`:
-
-- Locale and environment are initialized **before** constructing `QCoreApplication`.
-
-- A `--debug` flag is parsed from `argv` (optional).
-
-- The program enumerates all `*.metadata` files under `kBase`, and for each:
-
-  - loads `.metadata`
-  - skips deleted or trashed documents
-  - loads `.content`
-  - determines `fileType` (`pdf`/`epub`/`notebook`)
-  - builds the `pageId -> pageNumber` map
-  - reads all `pageTags` and converts them to `TagRef` entries
-
-Documents are stored into three lists:
-
-```cpp
-QList<DocEntry> pdfs, epubs, notebooks;
-```
-
-and sorted alphabetically by `visibleName`.
-
-#### 4. Interactive menu & tag listing
-
-At runtime, `mirtillo`:
-
-1. Asks which document type to list (`p`/`e`/`n`).  
-2. Prints a two-column index of documents.  
-3. Asks the user to select one by number.  
-4. Prints:
-   - Title  
-   - UUID  
-   - Parent UUID (or `false` if root)  
-5. Prints all tags for that document, with page numbers and page UUIDs.  
-6. If `--debug` is used, prints counters about scanned/deleted/trashed entries.
-
-This CLI core is the foundation for future features such as:
-
-- JSON export of the tag index,
-- PDF summary generation,
-- and a graphical tag/index viewer on the device.
 
 ---
 
-## ⚠️ Disclaimer
+# ⚠️ Disclaimer
 
 mirtillo:
 
-- does **not** patch, replace, or modify `xochitl`  
-- does **not** remount or alter the root filesystem  
-- operates fully within user space (`/home/root`)  
-- is compatible with official update policies  
+- does **not** replace or patch `xochitl`
+- does **not** modify or remount the system partition
+- operates fully in **/home/root**
+- is compatible with official update policies
 
-This project is **not affiliated with reMarkable AS**.
-
----
-
-## 📜 License
-
-MIT License
+This project is **not affiliated** with reMarkable AS.
 
 ---
 
-## ❤️ Contributions
+# 📜 License
 
-Pull requests are welcome.  
-If you build features involving thumbnails, annotation parsing, or PDF generation,  
-feel free to open an issue to discuss design choices.
+MIT License.
+
+---
+
+# ❤️ Contributions
+
+Pull requests are welcome!  
+If you add features (thumbnails, PDF summaries, GUI), please open an issue  
+to coordinate design choices.
