@@ -216,15 +216,53 @@ Prompts for password when necessary.
 
 ## 2) Deploy using SSH keys (recommended)
 
+Using SSH keys avoids entering the password at every deploy and makes
+scripts/deploy_to_paperpro.sh --sshkeys work instantly.
+
 # Generate a dedicated keypair for mirtillo
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/rm_key -C "remarkable-mirtillo"
 ```
 
+This will create:
+
+```bash
+~/.ssh/rm_key      (private key)
+~/.ssh/rm_key.pub  (public key)
+```
+
 ### Copy key to the Paper Pro
+Try the standard method first:
+
 ```bash
 ssh-copy-id -i ~/.ssh/rm_key.pub root@10.11.99.1
 ```
+
+⚠️ *If ssh-copy-id fails (common on bare-bones embedded systems)*
+
+Some minimal systems (including some reMarkable firmware builds) do not
+ship with ssh-copy-id. If the command fails or appears to work but
+`ssh -i ~/.ssh/rm_key root@10.11.99.1` still asks for a password,
+install the key **manually**:
+
+```bash
+scp ~/.ssh/rm_key.pub root@10.11.99.1:/home/root/
+ssh root@10.11.99.1 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat ~/rm_key.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && rm ~/rm_key.pub"
+```
+
+This guarantees:
+	•	`~/.ssh/` exists
+	•	correct permissions
+	•	key correctly appended to authorized_keys
+	•	no stray files left around
+
+Now test:
+
+```bash
+ssh -i ~/.ssh/rm_key root@10.11.99.1
+```
+
+If it logs in **without asking a password**, the setup is correct.
 
 ### Deploy without prompts
 ```bash
@@ -237,7 +275,7 @@ scripts/deploy_to_paperpro.sh --build --sshkeys
 
 The script:
 
-```
+```bash
 scripts/post-update-mirtillo-setup.sh
 ```
 

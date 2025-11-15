@@ -2,6 +2,9 @@
 /build/
 /build-*/
 
+# Backups
+/backup/
+
 # Scripts
 scripts/build_host.sh
 

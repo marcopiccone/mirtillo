@@ -12,6 +12,10 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 
 qt_add_executable(mirtillo
   src/main.cpp
+  src/logging.cpp
+  src/json_utils.cpp
+  src/scanner.cpp
+  src/export.cpp
 )
 
 target_link_libraries(mirtillo PRIVATE Qt6::Core)
